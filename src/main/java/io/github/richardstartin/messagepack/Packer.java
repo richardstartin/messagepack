@@ -8,6 +8,8 @@ import java.util.function.Function;
 
 public class Packer {
 
+    private static final int MAX_ARRAY_HEADER_SIZE = 5;
+
     // see https://github.com/msgpack/msgpack/blob/master/spec.md
     private static final byte NULL = (byte)0xC0;
 
@@ -42,7 +44,6 @@ public class Packer {
     private static final byte MAP16 = (byte)0xDE;
     private static final byte MAP32 = (byte)0xDF;
 
-    private static final byte FIXNUM = 0x0;
     private static final int NEGFIXNUM = 0xE0;
     private static final int FIXSTR = 0xA0;
     private static final int FIXARRAY = 0x90;
@@ -92,13 +93,14 @@ public class Packer {
 
 
     private final Consumer<ByteBuffer> blockingSink;
-
     private final ByteBuffer buffer;
+    private int messageCount = 0;
 
     Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
         this.codec = codec;
         this.blockingSink = blockingSink;
         this.buffer = buffer;
+        this.buffer.position(MAX_ARRAY_HEADER_SIZE);
         buffer.mark();
     }
 
@@ -114,6 +116,7 @@ public class Packer {
         try {
             mapper.map(message,this);
             buffer.mark();
+            ++messageCount;
         } catch (BufferOverflowException e) {
             if (retry) {
                 // go back to the last successfully written message
@@ -128,8 +131,18 @@ public class Packer {
 
     public void flush() {
         buffer.flip();
+        int pos = 0;
+        if (messageCount < 0x10) {
+            pos = 4;
+        } else if (messageCount < 0x10000) {
+            pos = 2;
+        }
+        buffer.position(pos);
+        writeArrayHeader(messageCount);
+        buffer.position(pos);
         blockingSink.accept(buffer.slice());
-        buffer.position(0);
+        buffer.position(MAX_ARRAY_HEADER_SIZE);
+        this.messageCount = 0;
     }
 
     public void writeNull() {
@@ -328,7 +341,7 @@ public class Packer {
     public void writeArrayHeader(int length) {
         if (length < 0x10) {
             buffer.put((byte) (FIXARRAY | length));
-        } else if (length < 0x100) {
+        } else if (length < 0x10000) {
             buffer.put(ARRAY16);
             buffer.putChar((char) length);
         } else {
@@ -353,12 +366,10 @@ public class Packer {
         if (length < 0x100) {
             buffer.put(BIN8);
             buffer.put((byte)length);
-        }
-        else if (length < 0x10000) {
+        } else if (length < 0x10000) {
             buffer.put(BIN16);
             buffer.putChar((char)length);
-        }
-        else {
+        } else {
             buffer.put(BIN32);
             buffer.putInt(length);
         }

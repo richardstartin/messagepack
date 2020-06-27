@@ -95,11 +95,15 @@ public class Packer {
 
     private final ByteBuffer buffer;
 
-    public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
+    Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
         this.codec = codec;
         this.blockingSink = blockingSink;
         this.buffer = buffer;
         buffer.mark();
+    }
+
+    public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, int bufferSize) {
+        this (codec, blockingSink, ByteBuffer.allocate(1 << -Long.numberOfLeadingZeros(bufferSize - 1)));
     }
 
     public <T> void serialise(T message, Mapper<T> mapper) {

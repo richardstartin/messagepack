@@ -147,16 +147,7 @@ public class Packer {
     }
 
     public void writeMap(Map<? extends CharSequence, Object> map, Function<CharSequence, byte[]> toBytes) {
-        int mapSize = map.size();
-        if (mapSize < 0x10) {
-            buffer.put((byte)(FIXMAP | mapSize));
-        } else if (mapSize < 0x10000) {
-            buffer.put(MAP16);
-            buffer.putChar((char) mapSize);
-        } else {
-            buffer.put(MAP32);
-            buffer.putInt(mapSize);
-        }
+        writeMapHeader(map.size());
         for (Map.Entry<? extends CharSequence, Object> entry : map.entrySet()) {
             writeString(entry.getKey(), toBytes);
             writeObject(entry.getValue(), toBytes);
@@ -313,6 +304,18 @@ public class Packer {
             buffer.putChar((char) length);
         } else {
             buffer.put(ARRAY32);
+            buffer.putInt(length);
+        }
+    }
+
+    public void writeMapHeader(int length) {
+        if (length < 0x10) {
+            buffer.put((byte)(FIXMAP | length));
+        } else if (length < 0x10000) {
+            buffer.put(MAP16);
+            buffer.putChar((char) length);
+        } else {
+            buffer.put(MAP32);
             buffer.putInt(length);
         }
     }

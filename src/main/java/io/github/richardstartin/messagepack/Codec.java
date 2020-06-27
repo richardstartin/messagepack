@@ -6,7 +6,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.Function;
 
-public class Codec extends ClassValue<Writer<?>> {
+public final class Codec extends ClassValue<Writer<?>> {
 
     public static final Codec INSTANCE = new Codec();
 
@@ -169,7 +169,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class CollectionWriter implements Writer<Collection<?>> {
+    private static final class CollectionWriter implements Writer<Collection<?>> {
 
         @Override
         public void write(Collection<?> collection, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -180,7 +180,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class ObjectArrayWriter implements Writer<Object[]> {
+    private static final class ObjectArrayWriter implements Writer<Object[]> {
 
         @Override
         public void write(Object[] array, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -191,7 +191,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class MapWriter implements Writer<Map<? extends CharSequence, Object>> {
+    private static final class MapWriter implements Writer<Map<? extends CharSequence, Object>> {
 
         @Override
         public void write(Map<? extends CharSequence, Object> value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -199,7 +199,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class DoubleWriter implements Writer<Double> {
+    private static final class DoubleWriter implements Writer<Double> {
 
         @Override
         public void write(Double value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -207,7 +207,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class BooleanWriter implements Writer<Boolean> {
+    private static final class BooleanWriter implements Writer<Boolean> {
 
         @Override
         public void write(Boolean value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -215,7 +215,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class FloatWriter implements Writer<Float> {
+    private static final class FloatWriter implements Writer<Float> {
 
         @Override
         public void write(Float value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -223,7 +223,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class IntWriter implements Writer<Integer> {
+    private static final class IntWriter implements Writer<Integer> {
 
         @Override
         public void write(Integer value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -231,7 +231,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class ShortWriter implements Writer<Short> {
+    private static final class ShortWriter implements Writer<Short> {
 
         @Override
         public void write(Short value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -239,7 +239,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class LongWriter implements Writer<Long> {
+    private static final class LongWriter implements Writer<Long> {
 
         @Override
         public void write(Long value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -247,7 +247,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class CharSequenceWriter implements Writer<CharSequence> {
+    private static final class CharSequenceWriter implements Writer<CharSequence> {
 
         public static final CharSequenceWriter INSTANCE = new CharSequenceWriter();
 
@@ -290,9 +290,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class CharArrayWriter implements Writer<char[]> {
-
-        public static final CharSequenceWriter INSTANCE = new CharSequenceWriter();
+    private static final class CharArrayWriter implements Writer<char[]> {
 
         @Override
         public void write(char[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
@@ -328,7 +326,7 @@ public class Codec extends ClassValue<Writer<?>> {
         }
     }
 
-    private static class DefaultWriter implements Writer<Object> {
+    private static final class DefaultWriter implements Writer<Object> {
 
         public static final DefaultWriter INSTANCE = new DefaultWriter();
 
@@ -337,7 +335,7 @@ public class Codec extends ClassValue<Writer<?>> {
             CharSequenceWriter.INSTANCE.write(String.valueOf(value), packer, NoOp.INSTANCE);
         }
 
-        private static class NoOp implements Function<CharSequence, byte[]> {
+        private static final class NoOp implements Function<CharSequence, byte[]> {
 
             public static final NoOp INSTANCE = new NoOp();
 

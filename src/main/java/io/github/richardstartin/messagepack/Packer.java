@@ -154,7 +154,6 @@ public class Packer {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public void writeString(CharSequence s, Function<CharSequence, byte[]> toBytes) {
         if (null == s) {
             writeNull();
@@ -181,7 +180,7 @@ public class Packer {
                                 buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
                             } else {
                                 int codePoint = Character.toCodePoint(c, next);
-                                buffer.put((byte) (0xf0 | (codePoint >> 18)));
+                                buffer.put((byte) (0xF0 | (codePoint >> 18)));
                                 buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
                                 buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
                                 buffer.put((byte) (0x80 | (codePoint & 0x3F)));
@@ -359,9 +358,5 @@ public class Packer {
             buffer.put(BIN32);
             buffer.putInt(length);
         }
-    }
-
-    ByteBuffer shareBuffer() {
-        return buffer;
     }
 }

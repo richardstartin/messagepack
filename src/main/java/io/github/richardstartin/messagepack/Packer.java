@@ -120,6 +120,9 @@ public class Packer {
     }
 
     public void flush() {
+        // go back to the last successfully written message
+        buffer.reset();
+        buffer.flip();
         blockingSink.accept(buffer.slice());
         buffer.position(0);
     }
@@ -161,12 +164,16 @@ public class Packer {
 
     @SuppressWarnings("unchecked")
     public void writeString(CharSequence s, Function<CharSequence, byte[]> toBytes) {
-        byte[] utf8 = toBytes.apply(s);
-        if (null == utf8) {
-            Writer<CharSequence> writer = (Writer<CharSequence>) codec.get(CharSequence.class);
-            writer.write(s, this, toBytes);
+        if (null == s) {
+            writeNull();
         } else {
-            writeUTF8(utf8, 0, utf8.length);
+            byte[] utf8 = toBytes.apply(s);
+            if (null == utf8) {
+                Writer<CharSequence> writer = (Writer<CharSequence>) codec.get(CharSequence.class);
+                writer.write(s, this, toBytes);
+            } else {
+                writeUTF8(utf8, 0, utf8.length);
+            }
         }
     }
 

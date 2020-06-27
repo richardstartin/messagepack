@@ -161,8 +161,34 @@ public class Packer {
         } else {
             byte[] utf8 = toBytes.apply(s);
             if (null == utf8) {
-                Writer<CharSequence> writer = (Writer<CharSequence>) codec.get(CharSequence.class);
-                writer.write(s, this, toBytes);
+                writeStringHeader(s.length());
+                for (int i = 0; i < s.length(); ++i) {
+                    char c = s.charAt(i);
+                    if (c < 0x80) {
+                        buffer.put((byte) c);
+                    } else if (c < 0x800) {
+                        buffer.put((byte) (0xC0 | (c >> 6)));
+                        buffer.put((byte) (0x80 | (c & 0x3F)));
+                    } else if (Character.isSurrogate(c)) {
+                        if (!Character.isHighSurrogate(c)) {
+                            buffer.put((byte) '?');
+                        } else if (++i == s.length()) {
+                            buffer.put((byte) '?');
+                        } else {
+                            char next = s.charAt(i);
+                            if (!Character.isLowSurrogate(next)) {
+                                buffer.put((byte) '?');
+                                buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
+                            } else {
+                                int codePoint = Character.toCodePoint(c, next);
+                                buffer.put((byte) (0xf0 | (codePoint >> 18)));
+                                buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
+                                buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
+                                buffer.put((byte) (0x80 | (codePoint & 0x3F)));
+                            }
+                        }
+                    }
+                }
             } else {
                 writeUTF8(utf8, 0, utf8.length);
             }

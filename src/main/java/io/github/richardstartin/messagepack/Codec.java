@@ -1,6 +1,7 @@
 package io.github.richardstartin.messagepack;
 
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -253,40 +254,7 @@ public final class Codec extends ClassValue<Writer<?>> {
 
         @Override
         public void write(CharSequence value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            byte[] bytes = toBytes.apply(value);
-            if (null == bytes) {
-                packer.writeStringHeader(value.length());
-                ByteBuffer buffer = packer.shareBuffer();
-                for (int i = 0; i < value.length(); ++i) {
-                    char c = value.charAt(i);
-                    if (c < 0x80) {
-                        buffer.put((byte) c);
-                    } else if (c < 0x800) {
-                        buffer.put((byte) (0xC0 | (c >> 6)));
-                        buffer.put((byte) (0x80 | (c & 0x3F)));
-                    } else if (Character.isSurrogate(c)) {
-                        if (!Character.isHighSurrogate(c)) {
-                            buffer.put((byte) '?');
-                        } else if (++i == value.length()) {
-                            buffer.put((byte) '?');
-                        } else {
-                            char next = value.charAt(i);
-                            if (!Character.isLowSurrogate(next)) {
-                                buffer.put((byte) '?');
-                                buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
-                            } else {
-                                int codePoint = Character.toCodePoint(c, next);
-                                buffer.put((byte) (0xf0 | (codePoint >> 18)));
-                                buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
-                                buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
-                                buffer.put((byte) (0x80 | (codePoint & 0x3F)));
-                            }
-                        }
-                    }
-                }
-            } else {
-                packer.writeUTF8(bytes, 0, bytes.length);
-            }
+            packer.writeString(value, toBytes);
         }
     }
 
@@ -294,35 +262,7 @@ public final class Codec extends ClassValue<Writer<?>> {
 
         @Override
         public void write(char[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            packer.writeStringHeader(value.length);
-            ByteBuffer buffer = packer.shareBuffer();
-            for (int i = 0; i < value.length; ++i) {
-                char c = value[i];
-                if (c < 0x80) {
-                    buffer.put((byte) c);
-                } else if (c < 0x800) {
-                    buffer.put((byte) (0xC0 | (c >> 6)));
-                    buffer.put((byte) (0x80 | (c & 0x3F)));
-                } else if (Character.isSurrogate(c)) {
-                    if (!Character.isHighSurrogate(c)) {
-                        buffer.put((byte) '?');
-                    } else if (++i == value.length) {
-                        buffer.put((byte) '?');
-                    } else {
-                        char next = value[i];
-                        if (!Character.isLowSurrogate(next)) {
-                            buffer.put((byte) '?');
-                            buffer.put(Character.isHighSurrogate(next) ? (byte) '?' : (byte) next);
-                        } else {
-                            int codePoint = Character.toCodePoint(c, next);
-                            buffer.put((byte) (0xf0 | (codePoint >> 18)));
-                            buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
-                            buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
-                            buffer.put((byte) (0x80 | (codePoint & 0x3F)));
-                        }
-                    }
-                }
-            }
+            packer.writeString(CharBuffer.wrap(value), toBytes);
         }
     }
 

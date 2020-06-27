@@ -171,10 +171,10 @@ public class Packer {
                     } else if (Character.isSurrogate(c)) {
                         if (!Character.isHighSurrogate(c)) {
                             buffer.put((byte) '?');
-                        } else if (++i == s.length()) {
+                        } else if (i + 1 == s.length()) {
                             buffer.put((byte) '?');
                         } else {
-                            char next = s.charAt(i);
+                            char next = s.charAt(i + 1);
                             if (!Character.isLowSurrogate(next)) {
                                 buffer.put((byte) '?');
                                 buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);

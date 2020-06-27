@@ -262,7 +262,7 @@ public final class Codec extends ClassValue<Writer<?>> {
 
         @Override
         public void write(char[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            packer.writeString(CharBuffer.wrap(value), toBytes);
+            packer.writeString(CharBuffer.wrap(value), NoOp.INSTANCE);
         }
     }
 
@@ -274,15 +274,15 @@ public final class Codec extends ClassValue<Writer<?>> {
         public void write(Object value, Packer packer, Function<CharSequence, byte[]> toBytes) {
             CharSequenceWriter.INSTANCE.write(String.valueOf(value), packer, NoOp.INSTANCE);
         }
+    }
 
-        private static final class NoOp implements Function<CharSequence, byte[]> {
+    private static final class NoOp implements Function<CharSequence, byte[]> {
 
-            public static final NoOp INSTANCE = new NoOp();
+        public static final NoOp INSTANCE = new NoOp();
 
-            @Override
-            public byte[] apply(CharSequence s) {
-                return null;
-            }
+        @Override
+        public byte[] apply(CharSequence s) {
+            return null;
         }
     }
 }

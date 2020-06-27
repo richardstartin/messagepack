@@ -112,6 +112,8 @@ public class Packer {
             buffer.mark();
         } catch (BufferOverflowException e) {
             if (retry) {
+                // go back to the last successfully written message
+                buffer.reset();
                 flush();
                 serialise(message, mapper, false);
             } else {
@@ -121,8 +123,6 @@ public class Packer {
     }
 
     public void flush() {
-        // go back to the last successfully written message
-        buffer.reset();
         buffer.flip();
         blockingSink.accept(buffer.slice());
         buffer.position(0);

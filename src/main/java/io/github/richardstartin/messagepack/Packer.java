@@ -99,6 +99,7 @@ public class Packer {
         this.codec = codec;
         this.blockingSink = blockingSink;
         this.buffer = buffer;
+        buffer.mark();
     }
 
     public <T> void serialise(T message, Mapper<T> mapper) {
@@ -106,9 +107,9 @@ public class Packer {
     }
 
     private <T> void serialise(T message, Mapper<T> mapper, boolean retry) {
-        buffer.mark();
         try {
             mapper.map(message,this);
+            buffer.mark();
         } catch (BufferOverflowException e) {
             if (retry) {
                 flush();

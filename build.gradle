@@ -1,12 +1,22 @@
 plugins {
     id 'java'
+    id "me.champeau.gradle.jmh" version "0.5.0"
 }
 
-group 'org.example'
+group 'io.github.richardstartin.messagepack'
 version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+}
+
+
+jmh {
+    jmhVersion = "1.23"
+    dependencies {
+        compile  "org.openjdk.jol:jol-core:0.10"
+        compile group: 'org.msgpack', name: 'msgpack-core', version: '0.8.20'
+    }
 }
 
 dependencies {

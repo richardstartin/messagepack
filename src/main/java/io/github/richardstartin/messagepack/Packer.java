@@ -6,8 +6,12 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+/**
+ * Not thread-safe (use one per thread).
+ */
 public class Packer {
 
+    private static final int UTF8_BUFFER_SIZE = 1024;
     private static final int MAX_ARRAY_HEADER_SIZE = 5;
 
     // see https://github.com/msgpack/msgpack/blob/master/spec.md
@@ -55,12 +59,18 @@ public class Packer {
     private final ByteBuffer buffer;
     private int messageCount = 0;
 
-    Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
+    private static final byte[] UTF8_BUFFER = new byte[UTF8_BUFFER_SIZE];
+
+    public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
         this.codec = codec;
         this.blockingSink = blockingSink;
         this.buffer = buffer;
         this.buffer.position(MAX_ARRAY_HEADER_SIZE);
         buffer.mark();
+    }
+
+    public Packer(Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
+        this (Codec.INSTANCE, blockingSink, buffer);
     }
 
     public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, int bufferSize) {
@@ -136,36 +146,79 @@ public class Packer {
         } else {
             byte[] utf8 = toBytes.apply(s);
             if (null == utf8) {
-                writeStringHeader(s.length());
-                for (int i = 0; i < s.length(); ++i) {
-                    char c = s.charAt(i);
-                    if (c < 0x80) {
-                        buffer.put((byte) c);
-                    } else if (c < 0x800) {
-                        buffer.put((byte) (0xC0 | (c >> 6)));
-                        buffer.put((byte) (0x80 | (c & 0x3F)));
-                    } else if (Character.isSurrogate(c)) {
-                        if (!Character.isHighSurrogate(c)) {
-                            buffer.put((byte) '?');
-                        } else if (i + 1 == s.length()) {
-                            buffer.put((byte) '?');
-                        } else {
-                            char next = s.charAt(i + 1);
-                            if (!Character.isLowSurrogate(next)) {
-                                buffer.put((byte) '?');
-                                buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
-                            } else {
-                                int codePoint = Character.toCodePoint(c, next);
-                                buffer.put((byte) (0xF0 | (codePoint >> 18)));
-                                buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
-                                buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
-                                buffer.put((byte) (0x80 | (codePoint & 0x3F)));
-                            }
-                        }
-                    }
+                if (s.length() * 2 < UTF8_BUFFER_SIZE) {
+                    encodeToUTF8ViaArray(s);
+                } else {
+                    encodeToUTF8Direct(s);
                 }
             } else {
                 writeUTF8(utf8, 0, utf8.length);
+            }
+        }
+    }
+
+    private void encodeToUTF8ViaArray(CharSequence s) {
+        byte[] buffer = UTF8_BUFFER;
+        writeStringHeader(s.length());
+        int out = 0;
+        for (int in = 0; in < s.length(); ++in) {
+            char c = s.charAt(in);
+            if (c < 0x80) {
+                buffer[out++] = ((byte) c);
+            } else if (c < 0x800) {
+                buffer[out++] = ((byte) (0xC0 | (c >> 6)));
+                buffer[out++] = ((byte) (0x80 | (c & 0x3F)));
+            } else if (Character.isSurrogate(c)) {
+                if (!Character.isHighSurrogate(c)) {
+                    buffer[out++] = ((byte) '?');
+                } else if (++in == s.length()) {
+                    buffer[out++] = ((byte) '?');
+                } else {
+                    char next = s.charAt(in);
+                    if (!Character.isLowSurrogate(next)) {
+                        buffer[out++] = ((byte) '?');
+                        buffer[out++] = (Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
+                    } else {
+                        int codePoint = Character.toCodePoint(c, next);
+                        buffer[out++] = ((byte) (0xF0 | (codePoint >> 18)));
+                        buffer[out++] = ((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
+                        buffer[out++] = ((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
+                        buffer[out++] = ((byte) (0x80 | (codePoint & 0x3F)));
+                    }
+                }
+            }
+        }
+        this.buffer.put(buffer, 0, out);
+    }
+
+    private void encodeToUTF8Direct(CharSequence s) {
+        // warning, incurs a lot of bounds checks overhead!
+        writeStringHeader(s.length());
+        for (int i = 0; i < s.length(); ++i) {
+            char c = s.charAt(i);
+            if (c < 0x80) {
+                buffer.put((byte) c);
+            } else if (c < 0x800) {
+                buffer.put((byte) (0xC0 | (c >> 6)));
+                buffer.put((byte) (0x80 | (c & 0x3F)));
+            } else if (Character.isSurrogate(c)) {
+                if (!Character.isHighSurrogate(c)) {
+                    buffer.put((byte) '?');
+                } else if (++i == s.length()) {
+                    buffer.put((byte) '?');
+                } else {
+                    char next = s.charAt(i);
+                    if (!Character.isLowSurrogate(next)) {
+                        buffer.put((byte) '?');
+                        buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
+                    } else {
+                        int codePoint = Character.toCodePoint(c, next);
+                        buffer.put((byte) (0xF0 | (codePoint >> 18)));
+                        buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
+                        buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
+                        buffer.put((byte) (0x80 | (codePoint & 0x3F)));
+                    }
+                }
             }
         }
     }

@@ -11,42 +11,42 @@ import java.util.function.Function;
  */
 public class Packer {
 
-    private static final int UTF8_BUFFER_SIZE = 1024;
+    private static final int UTF8_BUFFER_SIZE = 8;
     private static final int MAX_ARRAY_HEADER_SIZE = 5;
 
     // see https://github.com/msgpack/msgpack/blob/master/spec.md
-    private static final byte NULL = (byte)0xC0;
+    private static final byte NULL = (byte) 0xC0;
 
-    private static final byte FALSE = (byte)0xC2;
-    private static final byte TRUE = (byte)0xC3;
+    private static final byte FALSE = (byte) 0xC2;
+    private static final byte TRUE = (byte) 0xC3;
 
-    private static final byte UINT8 = (byte)0xCC;
-    private static final byte UINT16 = (byte)0xCD;
-    private static final byte UINT32 = (byte)0xCE;
-    private static final byte UINT64 = (byte)0xCF;
+    private static final byte UINT8 = (byte) 0xCC;
+    private static final byte UINT16 = (byte) 0xCD;
+    private static final byte UINT32 = (byte) 0xCE;
+    private static final byte UINT64 = (byte) 0xCF;
 
 
-    private static final byte INT8 = (byte)0xD0;
-    private static final byte INT16 = (byte)0xD1;
-    private static final byte INT32 = (byte)0xD2;
-    private static final byte INT64 = (byte)0xD3;
+    private static final byte INT8 = (byte) 0xD0;
+    private static final byte INT16 = (byte) 0xD1;
+    private static final byte INT32 = (byte) 0xD2;
+    private static final byte INT64 = (byte) 0xD3;
 
-    private static final byte FLOAT32 = (byte)0xCA;
-    private static final byte FLOAT64 = (byte)0xCB;
+    private static final byte FLOAT32 = (byte) 0xCA;
+    private static final byte FLOAT64 = (byte) 0xCB;
 
-    private static final byte STR8 = (byte)0xD9;
-    private static final byte STR16 = (byte)0xDA;
-    private static final byte STR32 = (byte)0xDB;
+    private static final byte STR8 = (byte) 0xD9;
+    private static final byte STR16 = (byte) 0xDA;
+    private static final byte STR32 = (byte) 0xDB;
 
-    private static final byte BIN8 = (byte)0xC4;
-    private static final byte BIN16 = (byte)0xC5;
-    private static final byte BIN32 = (byte)0xC6;
+    private static final byte BIN8 = (byte) 0xC4;
+    private static final byte BIN16 = (byte) 0xC5;
+    private static final byte BIN32 = (byte) 0xC6;
 
-    private static final byte ARRAY16 = (byte)0xDC;
-    private static final byte ARRAY32 = (byte)0xDD;
+    private static final byte ARRAY16 = (byte) 0xDC;
+    private static final byte ARRAY32 = (byte) 0xDD;
 
-    private static final byte MAP16 = (byte)0xDE;
-    private static final byte MAP32 = (byte)0xDF;
+    private static final byte MAP16 = (byte) 0xDE;
+    private static final byte MAP32 = (byte) 0xDF;
 
     private static final int NEGFIXNUM = 0xE0;
     private static final int FIXSTR = 0xA0;
@@ -70,31 +70,26 @@ public class Packer {
     }
 
     public Packer(Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
-        this (Codec.INSTANCE, blockingSink, buffer);
+        this(Codec.INSTANCE, blockingSink, buffer);
     }
 
     public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, int bufferSize) {
-        this (codec, blockingSink, ByteBuffer.allocate(1 << -Long.numberOfLeadingZeros(bufferSize - 1)));
+        this(codec, blockingSink, ByteBuffer.allocate(1 << -Long.numberOfLeadingZeros(bufferSize - 1)));
     }
 
     public <T> void serialise(T message, Mapper<T> mapper) {
-        serialise(message, mapper, true);
-    }
-
-    private <T> void serialise(T message, Mapper<T> mapper, boolean retry) {
         try {
-            mapper.map(message,this);
+            mapper.map(message, this);
             buffer.mark();
             ++messageCount;
         } catch (BufferOverflowException e) {
-            if (retry) {
-                // go back to the last successfully written message
-                buffer.reset();
-                flush();
-                serialise(message, mapper, false);
-            } else {
+            // go back to the last successfully written message
+            buffer.reset();
+            if (buffer.position() == 0) {
                 throw e;
             }
+            flush();
+            serialise(message, mapper);
         }
     }
 
@@ -146,10 +141,10 @@ public class Packer {
         } else {
             byte[] utf8 = toBytes.apply(s);
             if (null == utf8) {
-                if (s.length() * 2 < UTF8_BUFFER_SIZE) {
-                    encodeToUTF8ViaArray(s);
+                if (s.length() < UTF8_BUFFER_SIZE) {
+                    utf8EncodeWithArray(s);
                 } else {
-                    encodeToUTF8Direct(s);
+                    utf8Encode(s);
                 }
             } else {
                 writeUTF8(utf8, 0, utf8.length);
@@ -157,11 +152,41 @@ public class Packer {
         }
     }
 
-    private void encodeToUTF8ViaArray(CharSequence s) {
-        byte[] buffer = utf8Buffer;
+    private void utf8EncodeWithArray(CharSequence s) {
+        int mark = buffer.position();
         writeStringHeader(s.length());
+        int actualLength = utf8EncodeViaArray(s, 0);
+        if (actualLength > s.length()) {
+            int lengthWritten = stringLength(s.length());
+            int lengthRequired = stringLength(actualLength);
+            if (lengthRequired != lengthWritten) {
+                // could shift the string itself to the right but just do it again
+                buffer.position(mark);
+                writeStringHeader(actualLength);
+                utf8EncodeViaArray(s, 0);
+            } else { // just go back and fix it
+                switch (lengthRequired) {
+                    case FIXSTR:
+                        buffer.put(mark, (byte)(FIXSTR | lengthRequired));
+                        break;
+                    case STR8:
+                        buffer.put(mark + 1, (byte)(actualLength));
+                        break;
+                    case STR16:
+                        buffer.putChar(mark + 1, (char)(actualLength));
+                        break;
+                    case STR32:
+                        buffer.putInt(mark + 1, (actualLength));
+                        break;
+                }
+            }
+        }
+    }
+
+    private int utf8EncodeViaArray(CharSequence s, int in) {
+        byte[] buffer = utf8Buffer;
         int out = 0;
-        for (int in = 0; in < s.length(); ++in) {
+        for (; in < s.length() && out < buffer.length; ++in) {
             char c = s.charAt(in);
             if (c < 0x80) {
                 buffer[out++] = ((byte) c);
@@ -177,7 +202,7 @@ public class Packer {
                     char next = s.charAt(in);
                     if (!Character.isLowSurrogate(next)) {
                         buffer[out++] = ((byte) '?');
-                        buffer[out++] = (Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
+                        buffer[out++] = (Character.isHighSurrogate(next) ? (byte) '?' : (byte) next);
                     } else {
                         int codePoint = Character.toCodePoint(c, next);
                         buffer[out++] = ((byte) (0xF0 | (codePoint >> 18)));
@@ -189,38 +214,102 @@ public class Packer {
             }
         }
         this.buffer.put(buffer, 0, out);
+        if (in < s.length()) {
+            return out + utf8EncodeViaArray(s, in);
+        }
+        return out;
     }
 
-    private void encodeToUTF8Direct(CharSequence s) {
-        // warning, incurs a lot of bounds checks overhead!
+    private void utf8Encode(CharSequence s) {
+        int mark = buffer.position();
         writeStringHeader(s.length());
-        for (int i = 0; i < s.length(); ++i) {
-            char c = s.charAt(i);
-            if (c < 0x80) {
-                buffer.put((byte) c);
-            } else if (c < 0x800) {
-                buffer.put((byte) (0xC0 | (c >> 6)));
-                buffer.put((byte) (0x80 | (c & 0x3F)));
-            } else if (Character.isSurrogate(c)) {
-                if (!Character.isHighSurrogate(c)) {
-                    buffer.put((byte) '?');
-                } else if (++i == s.length()) {
-                    buffer.put((byte) '?');
-                } else {
-                    char next = s.charAt(i);
-                    if (!Character.isLowSurrogate(next)) {
-                        buffer.put((byte) '?');
-                        buffer.put(Character.isHighSurrogate(next)? (byte) '?' : (byte)next);
-                    } else {
-                        int codePoint = Character.toCodePoint(c, next);
-                        buffer.put((byte) (0xF0 | (codePoint >> 18)));
-                        buffer.put((byte) (0x80 | ((codePoint >> 12) & 0x3F)));
-                        buffer.put((byte) (0x80 | ((codePoint >> 6) & 0x3F)));
-                        buffer.put((byte) (0x80 | (codePoint & 0x3F)));
+        int actualLength = utf8EncodeSWAR(s);
+        if (actualLength > s.length()) {
+            int lengthWritten = stringLength(s.length());
+            int lengthRequired = stringLength(actualLength);
+            if (lengthRequired != lengthWritten) {
+                // could shift the string itself to the right but just do it again
+                buffer.position(mark);
+                writeStringHeader(actualLength);
+                utf8EncodeSWAR(s);
+            } else { // just go back and fix it
+                switch (lengthRequired) {
+                    case FIXSTR:
+                        buffer.put(mark, (byte)(FIXSTR | lengthRequired));
+                        break;
+                    case STR8:
+                        buffer.put(mark + 1, (byte)(actualLength));
+                        break;
+                    case STR16:
+                        buffer.putChar(mark + 1, (char)(actualLength));
+                        break;
+                    case STR32:
+                        buffer.putInt(mark + 1, (actualLength));
+                        break;
+                }
+            }
+        }
+    }
+
+    private int utf8EncodeSWAR(CharSequence s) {
+        int i = 0;
+        int written = 0;
+        long word;
+        for (; i + 7 < s.length(); i += 8) {
+            // bounds check elimination:
+            // latin 1 text will never use more than 7 bits per character,
+            // we can detect non latin 1 and revert to a slow path by
+            // merging the chars and
+            word = s.charAt(i);
+            word = (word << 8 | s.charAt(i + 1));
+            word = (word << 8 | s.charAt(i + 2));
+            word = (word << 8 | s.charAt(i + 3));
+            word = (word << 8 | s.charAt(i + 4));
+            word = (word << 8 | s.charAt(i + 5));
+            word = (word << 8 | s.charAt(i + 6));
+            word = (word << 8 | s.charAt(i + 7));
+            if ((word & 0x7F7F7F7F7F7F7F7FL) == word) {
+                buffer.putLong(word);
+                written += 8;
+            } else { // redo some work, stupid but careful
+                for (int j = i; j < i + 8; ++j) {
+                    char c = s.charAt(j);
+                    if (c < 0x80) {
+                        buffer.put((byte) c);
+                        written++;
+                    } else if (c < 0x800) {
+                        buffer.putChar((char) (((0xC0 | (c >> 6)) << 8) | (0x80 | (c & 0x3F))));
+                        written += 2;
+                    } else if (Character.isSurrogate(c)) {
+                        if (!Character.isHighSurrogate(c)) {
+                            buffer.put((byte) '?');
+                            written++;
+                        } else if (++j == s.length()) {
+                            buffer.put((byte) '?');
+                            written++;
+                        } else {
+                            char next = s.charAt(j);
+                            if (!Character.isLowSurrogate(next)) {
+                                buffer.put((byte) '?');
+                                buffer.put(Character.isHighSurrogate(next) ? (byte) '?' : (byte) next);
+                                written += 2;
+                            } else {
+                                int codePoint = Character.toCodePoint(c, next);
+                                buffer.putInt(((0xF0 | (codePoint >> 18)) << 24)
+                                        | ((0x80 | ((codePoint >> 12) & 0x3F)) << 16)
+                                        | ((0x80 | ((codePoint >> 6) & 0x3F)) << 8)
+                                        | ((0x80 | (codePoint & 0x3F))));
+                                written += 4;
+                            }
+                        }
                     }
                 }
             }
         }
+        if (i < s.length()) {
+            written += utf8EncodeViaArray(s, i);
+        }
+        return written;
     }
 
     public void writeUTF8(byte[] string, int offset, int length) {
@@ -271,12 +360,12 @@ public class Packer {
                 case 23:
                 case 24:
                     buffer.put(INT16);
-                    buffer.putChar((char)value);
+                    buffer.putChar((char) value);
                     break;
                 case 25:
                 case 26:
                     buffer.put(INT8);
-                    buffer.put((byte)value);
+                    buffer.put((byte) value);
                     break;
                 case 27:
                 case 28:
@@ -285,7 +374,7 @@ public class Packer {
                 case 31:
                 case 32:
                 default:
-                    buffer.put((byte)(NEGFIXNUM | value));
+                    buffer.put((byte) (NEGFIXNUM | value));
             }
         } else {
             switch (Integer.numberOfLeadingZeros(value)) {
@@ -317,11 +406,11 @@ public class Packer {
                 case 22:
                 case 23:
                     buffer.put(INT16);
-                    buffer.putChar((char)value);
+                    buffer.putChar((char) value);
                     break;
                 case 24:
                     buffer.put(INT8);
-                    buffer.put((byte)value);
+                    buffer.put((byte) value);
                     break;
                 case 25:
                 case 26:
@@ -332,7 +421,7 @@ public class Packer {
                 case 31:
                 case 32:
                 default:
-                    buffer.put((byte)value);
+                    buffer.put((byte) value);
             }
         }
     }
@@ -393,7 +482,7 @@ public class Packer {
                 case 47:
                 case 48:
                     buffer.put(INT32);
-                    buffer.putInt((int)value);
+                    buffer.putInt((int) value);
                     break;
                 case 49:
                 case 50:
@@ -404,12 +493,12 @@ public class Packer {
                 case 55:
                 case 56:
                     buffer.put(INT16);
-                    buffer.putChar((char)value);
+                    buffer.putChar((char) value);
                     break;
                 case 57:
                 case 58:
                     buffer.put(INT8);
-                    buffer.put((byte)value);
+                    buffer.put((byte) value);
                     break;
                 case 59:
                 case 60:
@@ -418,7 +507,7 @@ public class Packer {
                 case 63:
                 case 64:
                 default:
-                    buffer.put((byte)(NEGFIXNUM | value));
+                    buffer.put((byte) (NEGFIXNUM | value));
             }
         } else {
             switch (Long.numberOfLeadingZeros(value)) {
@@ -474,7 +563,7 @@ public class Packer {
                 case 46:
                 case 47:
                     buffer.put(INT32);
-                    buffer.putInt((int)value);
+                    buffer.putInt((int) value);
                     break;
                 case 48:
                 case 49:
@@ -485,11 +574,11 @@ public class Packer {
                 case 54:
                 case 55:
                     buffer.put(INT16);
-                    buffer.putChar((char)value);
+                    buffer.putChar((char) value);
                     break;
                 case 56:
                     buffer.put(INT8);
-                    buffer.put((byte)value);
+                    buffer.put((byte) value);
                     break;
                 case 57:
                 case 59:
@@ -499,7 +588,7 @@ public class Packer {
                 case 63:
                 case 64:
                 default:
-                    buffer.put((byte)value);
+                    buffer.put((byte) value);
             }
         }
     }
@@ -516,13 +605,13 @@ public class Packer {
 
     public void writeStringHeader(int length) {
         if (length < 0x10) {
-            buffer.put((byte)(FIXSTR | length));
+            buffer.put((byte) (FIXSTR | length));
         } else if (length < 0x100) {
             buffer.put(STR8);
-            buffer.put((byte)length);
+            buffer.put((byte) length);
         } else if (length < 0x10000) {
             buffer.put(STR16);
-            buffer.putChar((char)length);
+            buffer.putChar((char) length);
         } else {
             buffer.put(STR32);
             buffer.putInt(length);
@@ -543,7 +632,7 @@ public class Packer {
 
     public void writeMapHeader(int length) {
         if (length < 0x10) {
-            buffer.put((byte)(FIXMAP | length));
+            buffer.put((byte) (FIXMAP | length));
         } else if (length < 0x10000) {
             buffer.put(MAP16);
             buffer.putChar((char) length);
@@ -556,13 +645,25 @@ public class Packer {
     public void writeBinaryHeader(int length) {
         if (length < 0x100) {
             buffer.put(BIN8);
-            buffer.put((byte)length);
+            buffer.put((byte) length);
         } else if (length < 0x10000) {
             buffer.put(BIN16);
-            buffer.putChar((char)length);
+            buffer.putChar((char) length);
         } else {
             buffer.put(BIN32);
             buffer.putInt(length);
+        }
+    }
+
+    private static int stringLength(int length) {
+        if (length < 0x10) {
+            return FIXSTR;
+        } else if (length < 0x100) {
+            return STR8;
+        } else if (length < 0x10000) {
+            return STR16;
+        } else {
+            return STR32;
         }
     }
 }

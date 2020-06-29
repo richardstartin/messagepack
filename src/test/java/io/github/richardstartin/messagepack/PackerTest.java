@@ -35,6 +35,8 @@ public class PackerTest {
             foo.tags.put("foo", 9f);
             foo.tags.put("bar", 9d);
             foo.tags.put("qux", "tag");
+            foo.tags.put("provoke size recalculation", "Sei ruhig, bleibe ruhig, mein Kind;\nIn dürren Blättern säuselt der Wind.");
+            foo.tags.put("provoke re-encoding", "straßenschilder");
             foo.tags.put("list", Collections.singletonList("element"));
             return foo;
         }

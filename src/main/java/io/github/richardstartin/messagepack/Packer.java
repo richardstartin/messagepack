@@ -59,7 +59,7 @@ public class Packer {
     private final ByteBuffer buffer;
     private int messageCount = 0;
 
-    private static final byte[] UTF8_BUFFER = new byte[UTF8_BUFFER_SIZE];
+    private final byte[] utf8Buffer = new byte[UTF8_BUFFER_SIZE];
 
     public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
         this.codec = codec;
@@ -158,7 +158,7 @@ public class Packer {
     }
 
     private void encodeToUTF8ViaArray(CharSequence s) {
-        byte[] buffer = UTF8_BUFFER;
+        byte[] buffer = utf8Buffer;
         writeStringHeader(s.length());
         int out = 0;
         for (int in = 0; in < s.length(); ++in) {

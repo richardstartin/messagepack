@@ -56,6 +56,9 @@ public final class Codec extends ClassValue<Writer<?>> {
         if (Collection.class.isAssignableFrom(clazz)) {
             return new CollectionWriter();
         }
+        if (ByteBuffer.class.isAssignableFrom(clazz)) {
+            return new ByteBufferWriter();
+        }
         if (clazz.isArray()) {
             if (byte[].class == clazz) {
                 return new ByteArrayWriter();

@@ -255,11 +255,11 @@ public class Packer {
         int i = 0;
         int written = 0;
         long word;
-        for (; i + 7 < s.length(); i += 8) {
+        while (i + 7 < s.length()) {
             // bounds check elimination:
             // latin 1 text will never use more than 7 bits per character,
             // we can detect non latin 1 and revert to a slow path by
-            // merging the chars and
+            // merging the chars and checking every 8th bit is empty
             word = s.charAt(i);
             word = (word << 8 | s.charAt(i + 1));
             word = (word << 8 | s.charAt(i + 2));
@@ -271,8 +271,10 @@ public class Packer {
             if ((word & 0x7F7F7F7F7F7F7F7FL) == word) {
                 buffer.putLong(word);
                 written += 8;
+                i += 8;
             } else { // redo some work, stupid but careful
-                for (int j = i; j < i + 8; ++j) {
+                int j = i;
+                for (; j < i + 8; ++j) {
                     char c = s.charAt(j);
                     if (c < 0x80) {
                         buffer.put((byte) c);
@@ -304,6 +306,7 @@ public class Packer {
                         }
                     }
                 }
+                i = j;
             }
         }
         if (i < s.length()) {

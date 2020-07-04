@@ -59,7 +59,7 @@ public class Packer {
     private final ByteBuffer buffer;
     private int messageCount = 0;
 
-    private final byte[] utf8Buffer = new byte[UTF8_BUFFER_SIZE];
+    private final byte[] utf8Buffer = new byte[UTF8_BUFFER_SIZE * 4];
 
     public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, ByteBuffer buffer) {
         this.codec = codec;
@@ -73,10 +73,6 @@ public class Packer {
         this(Codec.INSTANCE, blockingSink, buffer);
     }
 
-    public Packer(Codec codec, Consumer<ByteBuffer> blockingSink, int bufferSize) {
-        this(codec, blockingSink, ByteBuffer.allocate(1 << -Long.numberOfLeadingZeros(bufferSize - 1)));
-    }
-
     public <T> void serialise(T message, Mapper<T> mapper) {
         try {
             mapper.map(message, this);
@@ -85,7 +81,7 @@ public class Packer {
         } catch (BufferOverflowException e) {
             // go back to the last successfully written message
             buffer.reset();
-            if (buffer.position() == 0) {
+            if (buffer.position() == MAX_ARRAY_HEADER_SIZE) {
                 throw e;
             }
             flush();
@@ -127,9 +123,9 @@ public class Packer {
         }
     }
 
-    public void writeMap(Map<? extends CharSequence, Object> map, Function<CharSequence, byte[]> toBytes) {
+    public void writeMap(Map<? extends CharSequence, ? extends Object> map, Function<CharSequence, byte[]> toBytes) {
         writeMapHeader(map.size());
-        for (Map.Entry<? extends CharSequence, Object> entry : map.entrySet()) {
+        for (Map.Entry<? extends CharSequence, ? extends Object> entry : map.entrySet()) {
             writeString(entry.getKey(), toBytes);
             writeObject(entry.getValue(), toBytes);
         }
@@ -165,20 +161,7 @@ public class Packer {
                 writeStringHeader(actualLength);
                 utf8EncodeViaArray(s, 0);
             } else { // just go back and fix it
-                switch (lengthRequired) {
-                    case FIXSTR:
-                        buffer.put(mark, (byte)(FIXSTR | lengthRequired));
-                        break;
-                    case STR8:
-                        buffer.put(mark + 1, (byte)(actualLength));
-                        break;
-                    case STR16:
-                        buffer.putChar(mark + 1, (char)(actualLength));
-                        break;
-                    case STR32:
-                        buffer.putInt(mark + 1, (actualLength));
-                        break;
-                }
+                fixStringHeaderInPlace(mark, lengthRequired, actualLength);
             }
         }
     }
@@ -211,6 +194,10 @@ public class Packer {
                         buffer[out++] = ((byte) (0x80 | (codePoint & 0x3F)));
                     }
                 }
+            } else {
+                buffer[out++] = (byte)(0xE0 | c >> 12);
+                buffer[out++] = (byte)(0x80 | c >> 6 & 0x3F);
+                buffer[out++] = (byte)(0x80 | c & 0x3F);
             }
         }
         this.buffer.put(buffer, 0, out);
@@ -233,20 +220,7 @@ public class Packer {
                 writeStringHeader(actualLength);
                 utf8EncodeSWAR(s);
             } else { // just go back and fix it
-                switch (lengthRequired) {
-                    case FIXSTR:
-                        buffer.put(mark, (byte)(FIXSTR | lengthRequired));
-                        break;
-                    case STR8:
-                        buffer.put(mark + 1, (byte)(actualLength));
-                        break;
-                    case STR16:
-                        buffer.putChar(mark + 1, (char)(actualLength));
-                        break;
-                    case STR32:
-                        buffer.putInt(mark + 1, (actualLength));
-                        break;
-                }
+                fixStringHeaderInPlace(mark, lengthRequired, actualLength);
             }
         }
     }
@@ -304,6 +278,11 @@ public class Packer {
                                 written += 4;
                             }
                         }
+                    } else {
+                        buffer.put((byte)(0xE0 | c >> 12));
+                        buffer.put((byte)(0x80 | c >> 6 & 0x3F));
+                        buffer.put((byte)(0x80 | c & 0x3F));
+                        written += 3;
                     }
                 }
                 i = j;
@@ -667,6 +646,23 @@ public class Packer {
             return STR16;
         } else {
             return STR32;
+        }
+    }
+
+    private void fixStringHeaderInPlace(int mark, int lengthType, int actualLength) {
+        switch (lengthType) {
+            case FIXSTR:
+                buffer.put(mark, (byte)(FIXSTR | actualLength));
+                break;
+            case STR8:
+                buffer.put(mark + 1, (byte)(actualLength));
+                break;
+            case STR16:
+                buffer.putChar(mark + 1, (char)(actualLength));
+                break;
+            case STR32:
+                buffer.putInt(mark + 1, (actualLength));
+                break;
         }
     }
 }

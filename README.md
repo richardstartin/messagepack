@@ -9,13 +9,13 @@ var serialiser = new Packer(b -> send(b), buffer);
 for (MyMetric o : myMetrics) {
   serialiser.serialise(o, (x, w) -> {
      w.writeString("id");
-     w.writeLong(o.getId());
+     w.writeLong(x.getId());
      w.writeString("name");
-     w.writeString(o.getName());
+     w.writeString(x.getName());
      w.writeString("value");
-     w.writeDouble(o.getValue());
+     w.writeDouble(x.getValue());
      w.writeString("tags");
-     w.writeMap(o.getTags());
+     w.writeMap(x.getTags());
 });
 serialiser.flush();
 

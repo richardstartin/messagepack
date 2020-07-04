@@ -2,18 +2,17 @@ package io.github.richardstartin.messagepack;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
-import java.util.function.Function;
 
 public interface Writable {
     void writeNull();
 
     void writeBoolean(boolean value);
 
-    void writeObject(Object value, Function<CharSequence, byte[]> toBytes);
+    void writeObject(Object value, EncodingCache encodingCache);
 
-    void writeMap(Map<? extends CharSequence, ?> map, Function<CharSequence, byte[]> toBytes);
+    void writeMap(Map<? extends CharSequence, ?> map, EncodingCache encodingCache);
 
-    void writeString(CharSequence s, Function<CharSequence, byte[]> toBytes);
+    void writeString(CharSequence s, EncodingCache encodingCache);
 
     void writeUTF8(byte[] string, int offset, int length);
 

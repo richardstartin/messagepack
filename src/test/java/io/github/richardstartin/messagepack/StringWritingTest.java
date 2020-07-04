@@ -15,7 +15,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -23,10 +22,10 @@ import static org.junit.Assert.assertNotNull;
 @RunWith(Parameterized.class)
 public class StringWritingTest {
 
-    private static final Function<CharSequence, byte[]> NO_CACHE = s -> null;
-    private static final Map<CharSequence, byte[]> CACHE_IMPL = new HashMap<>();
-    private static final Function<CharSequence, byte[]> CACHE = s -> CACHE_IMPL.computeIfAbsent(s,
-            x -> ((String) x).getBytes(StandardCharsets.UTF_8));
+    private static final EncodingCache NO_CACHE = EncodingCachingStrategies.none();
+
+    private static final EncodingCache CACHE =
+            EncodingCachingStrategies.memoise(s -> ((String)s).getBytes(StandardCharsets.UTF_8));
 
     private final List<Map<String, String>> maps;
     private final ByteBuffer buffer = ByteBuffer.allocate(10 << 10);

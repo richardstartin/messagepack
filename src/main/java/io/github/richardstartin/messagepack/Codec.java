@@ -5,7 +5,6 @@ import java.nio.CharBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.function.Function;
 
 public final class Codec extends ClassValue<Writer<?>> {
 
@@ -92,7 +91,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class IntArrayWriter implements Writer<int[]> {
 
         @Override
-        public void write(int[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(int[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(value.length);
             for (int i : value) {
                 packer.writeInt(i);
@@ -103,7 +102,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class ShortArrayWriter implements Writer<short[]> {
 
         @Override
-        public void write(short[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(short[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(value.length);
             for (short i : value) {
                 packer.writeInt(i);
@@ -114,7 +113,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class ByteArrayWriter implements Writer<byte[]> {
 
         @Override
-        public void write(byte[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(byte[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeBinary(value, 0, value.length);
         }
     }
@@ -122,7 +121,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class ByteBufferWriter implements Writer<ByteBuffer> {
 
         @Override
-        public void write(ByteBuffer buffer, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(ByteBuffer buffer, Packer packer, EncodingCache encodingCache) {
             packer.writeBinary(buffer);
         }
     }
@@ -130,7 +129,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class BooleanArrayWriter implements Writer<boolean[]> {
 
         @Override
-        public void write(boolean[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(boolean[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(value.length);
             for (boolean i : value) {
                 packer.writeBoolean(i);
@@ -141,7 +140,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class DoubleArrayWriter implements Writer<double[]> {
 
         @Override
-        public void write(double[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(double[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(value.length);
             for (double i : value) {
                 packer.writeDouble(i);
@@ -153,7 +152,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class FloatArrayWriter implements Writer<float[]> {
 
         @Override
-        public void write(float[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(float[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(value.length);
             for (float i : value) {
                 packer.writeFloat(i);
@@ -165,7 +164,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class LongArrayWriter implements Writer<long[]> {
 
         @Override
-        public void write(long[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(long[] value, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(value.length);
             for (long i : value) {
                 packer.writeLong(i);
@@ -176,10 +175,10 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class CollectionWriter implements Writer<Collection<?>> {
 
         @Override
-        public void write(Collection<?> collection, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Collection<?> collection, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(collection.size());
             for (Object value : collection) {
-                packer.writeObject(value, toBytes);
+                packer.writeObject(value, encodingCache);
             }
         }
     }
@@ -187,10 +186,10 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class ObjectArrayWriter implements Writer<Object[]> {
 
         @Override
-        public void write(Object[] array, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Object[] array, Packer packer, EncodingCache encodingCache) {
             packer.writeArrayHeader(array.length);
             for (Object value : array) {
-                packer.writeObject(value, toBytes);
+                packer.writeObject(value, encodingCache);
             }
         }
     }
@@ -198,15 +197,15 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class MapWriter implements Writer<Map<? extends CharSequence, Object>> {
 
         @Override
-        public void write(Map<? extends CharSequence, Object> value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            packer.writeMap(value, toBytes);
+        public void write(Map<? extends CharSequence, Object> value, Packer packer, EncodingCache encodingCache) {
+            packer.writeMap(value, encodingCache);
         }
     }
 
     private static final class DoubleWriter implements Writer<Double> {
 
         @Override
-        public void write(Double value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Double value, Packer packer, EncodingCache encodingCache) {
             packer.writeDouble(value);
         }
     }
@@ -214,7 +213,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class BooleanWriter implements Writer<Boolean> {
 
         @Override
-        public void write(Boolean value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Boolean value, Packer packer, EncodingCache encodingCache) {
             packer.writeBoolean(value);
         }
     }
@@ -222,7 +221,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class FloatWriter implements Writer<Float> {
 
         @Override
-        public void write(Float value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Float value, Packer packer, EncodingCache encodingCache) {
             packer.writeFloat(value);
         }
     }
@@ -230,7 +229,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class IntWriter implements Writer<Integer> {
 
         @Override
-        public void write(Integer value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Integer value, Packer packer, EncodingCache encodingCache) {
             packer.writeInt(value);
         }
     }
@@ -238,7 +237,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class ShortWriter implements Writer<Short> {
 
         @Override
-        public void write(Short value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Short value, Packer packer, EncodingCache encodingCache) {
             packer.writeInt(value);
         }
     }
@@ -246,7 +245,7 @@ public final class Codec extends ClassValue<Writer<?>> {
     private static final class LongWriter implements Writer<Long> {
 
         @Override
-        public void write(Long value, Packer packer, Function<CharSequence, byte[]> toBytes) {
+        public void write(Long value, Packer packer, EncodingCache encodingCache) {
             packer.writeLong(value);
         }
     }
@@ -256,16 +255,16 @@ public final class Codec extends ClassValue<Writer<?>> {
         public static final CharSequenceWriter INSTANCE = new CharSequenceWriter();
 
         @Override
-        public void write(CharSequence value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            packer.writeString(value, toBytes);
+        public void write(CharSequence value, Packer packer, EncodingCache encodingCache) {
+            packer.writeString(value, encodingCache);
         }
     }
 
     private static final class CharArrayWriter implements Writer<char[]> {
 
         @Override
-        public void write(char[] value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            packer.writeString(CharBuffer.wrap(value), NoOp.INSTANCE);
+        public void write(char[] value, Packer packer, EncodingCache encodingCache) {
+            packer.writeString(CharBuffer.wrap(value), EncodingCachingStrategies.none());
         }
     }
 
@@ -274,18 +273,8 @@ public final class Codec extends ClassValue<Writer<?>> {
         public static final DefaultWriter INSTANCE = new DefaultWriter();
 
         @Override
-        public void write(Object value, Packer packer, Function<CharSequence, byte[]> toBytes) {
-            CharSequenceWriter.INSTANCE.write(String.valueOf(value), packer, NoOp.INSTANCE);
-        }
-    }
-
-    private static final class NoOp implements Function<CharSequence, byte[]> {
-
-        public static final NoOp INSTANCE = new NoOp();
-
-        @Override
-        public byte[] apply(CharSequence s) {
-            return null;
+        public void write(Object value, Packer packer, EncodingCache encodingCache) {
+            CharSequenceWriter.INSTANCE.write(String.valueOf(value), packer, EncodingCachingStrategies.none());
         }
     }
 }

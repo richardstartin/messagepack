@@ -46,7 +46,7 @@ public class SmokeTest {
         put("foo", "foo".getBytes(StandardCharsets.UTF_8));
         put("id1", "id1".getBytes(StandardCharsets.UTF_8));
     }};
-    Function<CharSequence, byte[]> toBytes = constantPool::get;
+    EncodingCache toBytes = EncodingCachingStrategies.constantPool(constantPool);
     @Test
     public void testWriteMessage() {
         Foo message = Foo.create();

@@ -4,7 +4,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Not thread-safe (use one per thread).
@@ -119,30 +118,30 @@ public class Packer implements Writable, Serialiser {
 
     @Override
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public void writeObject(Object value, Function<CharSequence, byte[]> toBytes) {
+    public void writeObject(Object value, EncodingCache encodingCache) {
         if (null == value) {
             writeNull();
         } else {
             Writer writer = codec.get(value.getClass());
-            writer.write(value, this, toBytes);
+            writer.write(value, this, encodingCache);
         }
     }
 
     @Override
-    public void writeMap(Map<? extends CharSequence, ? extends Object> map, Function<CharSequence, byte[]> toBytes) {
+    public void writeMap(Map<? extends CharSequence, ? extends Object> map, EncodingCache encodingCache) {
         writeMapHeader(map.size());
         for (Map.Entry<? extends CharSequence, ? extends Object> entry : map.entrySet()) {
-            writeString(entry.getKey(), toBytes);
-            writeObject(entry.getValue(), toBytes);
+            writeString(entry.getKey(), encodingCache);
+            writeObject(entry.getValue(), encodingCache);
         }
     }
 
     @Override
-    public void writeString(CharSequence s, Function<CharSequence, byte[]> toBytes) {
+    public void writeString(CharSequence s, EncodingCache encodingCache) {
         if (null == s) {
             writeNull();
         } else {
-            byte[] utf8 = toBytes.apply(s);
+            byte[] utf8 = encodingCache.encode(s);
             if (null == utf8) {
                 if (s.length() < UTF8_BUFFER_SIZE) {
                     utf8EncodeWithArray(s);

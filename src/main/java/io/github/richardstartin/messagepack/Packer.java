@@ -9,7 +9,7 @@ import java.util.function.Function;
 /**
  * Not thread-safe (use one per thread).
  */
-public class Packer {
+public class Packer implements Writable, Serialiser {
 
     private static final int UTF8_BUFFER_SIZE = 8;
     private static final int MAX_ARRAY_HEADER_SIZE = 5;
@@ -73,6 +73,7 @@ public class Packer {
         this(Codec.INSTANCE, blockingSink, buffer);
     }
 
+    @Override
     public <T> void serialise(T message, Mapper<T> mapper) {
         try {
             mapper.map(message, this);
@@ -89,6 +90,7 @@ public class Packer {
         }
     }
 
+    @Override
     public void flush() {
         buffer.flip();
         int pos = 0;
@@ -105,14 +107,17 @@ public class Packer {
         this.messageCount = 0;
     }
 
+    @Override
     public void writeNull() {
         buffer.put(NULL);
     }
 
+    @Override
     public void writeBoolean(boolean value) {
         buffer.put(value ? TRUE : FALSE);
     }
 
+    @Override
     @SuppressWarnings({"rawtypes", "unchecked"})
     public void writeObject(Object value, Function<CharSequence, byte[]> toBytes) {
         if (null == value) {
@@ -123,6 +128,7 @@ public class Packer {
         }
     }
 
+    @Override
     public void writeMap(Map<? extends CharSequence, ? extends Object> map, Function<CharSequence, byte[]> toBytes) {
         writeMapHeader(map.size());
         for (Map.Entry<? extends CharSequence, ? extends Object> entry : map.entrySet()) {
@@ -131,6 +137,7 @@ public class Packer {
         }
     }
 
+    @Override
     public void writeString(CharSequence s, Function<CharSequence, byte[]> toBytes) {
         if (null == s) {
             writeNull();
@@ -294,22 +301,26 @@ public class Packer {
         return written;
     }
 
+    @Override
     public void writeUTF8(byte[] string, int offset, int length) {
         writeStringHeader(length);
         buffer.put(string, offset, length);
     }
 
+    @Override
     public void writeBinary(byte[] binary, int offset, int length) {
         writeBinaryHeader(length);
         buffer.put(binary, offset, length);
     }
 
-    public void writeBinary(ByteBuffer buffer) {
-        ByteBuffer slice = buffer.slice();
+    @Override
+    public void writeBinary(ByteBuffer binary) {
+        ByteBuffer slice = binary.slice();
         writeBinaryHeader(slice.limit() - slice.position());
         buffer.put(slice);
     }
 
+    @Override
     public void writeInt(int value) {
         if (value < 0) {
             switch (Integer.numberOfLeadingZeros(~value)) {
@@ -376,7 +387,7 @@ public class Packer {
                 case 13:
                 case 14:
                 case 15:
-                    buffer.put(INT32);
+                    buffer.put(UINT32);
                     buffer.putInt(value);
                     break;
                 case 16:
@@ -387,11 +398,11 @@ public class Packer {
                 case 21:
                 case 22:
                 case 23:
-                    buffer.put(INT16);
+                    buffer.put(UINT16);
                     buffer.putChar((char) value);
                     break;
                 case 24:
-                    buffer.put(INT8);
+                    buffer.put(UINT8);
                     buffer.put((byte) value);
                     break;
                 case 25:
@@ -408,6 +419,7 @@ public class Packer {
         }
     }
 
+    @Override
     public void writeLong(long value) {
         if (value < 0) {
             switch (Long.numberOfLeadingZeros(~value)) {
@@ -525,7 +537,7 @@ public class Packer {
                 case 29:
                 case 30:
                 case 31:
-                    buffer.put(INT64);
+                    buffer.put(UINT64);
                     buffer.putLong(value);
                     break;
                 case 32:
@@ -544,7 +556,7 @@ public class Packer {
                 case 45:
                 case 46:
                 case 47:
-                    buffer.put(INT32);
+                    buffer.put(UINT32);
                     buffer.putInt((int) value);
                     break;
                 case 48:
@@ -555,11 +567,11 @@ public class Packer {
                 case 53:
                 case 54:
                 case 55:
-                    buffer.put(INT16);
+                    buffer.put(UINT16);
                     buffer.putChar((char) value);
                     break;
                 case 56:
-                    buffer.put(INT8);
+                    buffer.put(UINT8);
                     buffer.put((byte) value);
                     break;
                 case 57:
@@ -575,11 +587,13 @@ public class Packer {
         }
     }
 
+    @Override
     public void writeFloat(float value) {
         buffer.put(FLOAT32);
         buffer.putFloat(value);
     }
 
+    @Override
     public void writeDouble(double value) {
         buffer.put(FLOAT64);
         buffer.putDouble(value);

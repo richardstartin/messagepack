@@ -39,7 +39,7 @@ public class StringWritingTest {
     @Parameterized.Parameters
     public static Object[][] maps() {
         return new Object[][]{
-                 {
+                {
                         Arrays.asList(
                                 new HashMap<String, String>() {{
                                     put("english", "buh-bye");
@@ -52,7 +52,12 @@ public class StringWritingTest {
                                 new HashMap<>() {{
                                     put("hani", "道");
                                     put("foo", "bar");
-                                }})
+                                }},
+                                new HashMap<>() {{
+                                    put("hani", "道道道");
+                                    put("foo", "bar");
+                                }}),
+
 
                 },
                 {

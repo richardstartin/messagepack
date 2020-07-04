@@ -9,10 +9,9 @@ public interface Writable {
 
     void writeBoolean(boolean value);
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
     void writeObject(Object value, Function<CharSequence, byte[]> toBytes);
 
-    void writeMap(Map<? extends CharSequence, ? extends Object> map, Function<CharSequence, byte[]> toBytes);
+    void writeMap(Map<? extends CharSequence, ?> map, Function<CharSequence, byte[]> toBytes);
 
     void writeString(CharSequence s, Function<CharSequence, byte[]> toBytes);
 

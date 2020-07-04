@@ -6,8 +6,10 @@ import java.util.function.Function;
 
 public class EncodingCachingStrategies {
 
+    private static final EncodingCache NONE = s -> null;
+
     public static EncodingCache none() {
-        return s -> null;
+        return NONE;
     }
 
     public static EncodingCache constantPool(Map<? extends CharSequence, byte[]> constants) {

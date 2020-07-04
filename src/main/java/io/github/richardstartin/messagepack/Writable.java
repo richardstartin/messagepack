@@ -14,6 +14,19 @@ public interface Writable {
 
     void writeString(CharSequence s, EncodingCache encodingCache);
 
+
+    default void writeObject(Object value) {
+        writeObject(value, EncodingCachingStrategies.none());
+    }
+
+    default void writeMap(Map<? extends CharSequence, ?> map) {
+        writeMap(map, EncodingCachingStrategies.none());
+    }
+
+    default void writeString(CharSequence s) {
+        writeString(s, EncodingCachingStrategies.none());
+    }
+
     void writeUTF8(byte[] string, int offset, int length);
 
     void writeBinary(byte[] binary, int offset, int length);

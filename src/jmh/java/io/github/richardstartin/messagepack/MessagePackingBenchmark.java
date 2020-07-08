@@ -6,12 +6,10 @@ import org.msgpack.core.buffer.ArrayBufferOutput;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Function;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -361,19 +359,23 @@ MessagePackingBenchmark.utf8Packer:·gc.count                                   
         @Param({"4", "8", "16", "32"})
         int keySize;
 
+        @Param({"true", "false"})
+        boolean mixedTypes;
+
 
         long[] longs;
-        String[] strings;
+        CharSequence[] strings;
         byte[][] utf8s;
 
         public void init() {
             longs = new long[size];
-            strings = new String[size];
+            strings = new CharSequence[size];
             utf8s = new byte[size][];
             for (int i = 0; i < size; ++i) {
                 longs[i] = ThreadLocalRandom.current().nextLong(-Long.MIN_VALUE, Long.MAX_VALUE);
-                strings[i] = Strings.create(keySize);
-                utf8s[i] = strings[i].getBytes(UTF_8);
+                String s = Strings.create(keySize);
+                strings[i] = mixedTypes ? ThreadLocalRandom.current().nextBoolean() ? s : new StringBackedCharSequence(s) : s;
+                utf8s[i] = s.getBytes(UTF_8);
             }
         }
     }
@@ -393,7 +395,7 @@ MessagePackingBenchmark.utf8Packer:·gc.count                                   
         ByteBuffer buffer;
         Packer packer;
         Map<CharSequence, byte[]> cache;
-        Function<CharSequence, byte[]> toBytes;
+        EncodingCache toBytes;
 
         @Setup(Level.Trial)
         public void init() {
@@ -403,29 +405,13 @@ MessagePackingBenchmark.utf8Packer:·gc.count                                   
                     : ByteBuffer.allocate(bufferSizeMB << 20);
             packer = new Packer(buff -> {}, buffer);
             cache = new HashMap<>();
-            for (String s : strings) {
+            for (CharSequence s : strings) {
                 if (ThreadLocalRandom.current().nextDouble() < cachePercentage) {
-                    cache.put(s, s.getBytes(UTF_8));
+                    cache.put(s, s instanceof String ? ((String) s).getBytes(UTF_8)
+                            : ((StringBackedCharSequence)s).getBytes(UTF_8));
                 }
             }
             toBytes = cache::get;
-        }
-    }
-
-    @State(Scope.Benchmark)
-    public static class MessagePackerState extends DataState {
-
-        @Param({"1"})
-        int bufferSizeMB;
-
-        ArrayBufferOutput messageBufferOutput;
-        MessagePacker packer;
-
-        @Setup(Level.Trial)
-        public void init() {
-            super.init();
-            messageBufferOutput = new ArrayBufferOutput(bufferSizeMB << 20);
-            packer = MessagePack.newDefaultPacker(messageBufferOutput);
         }
     }
 
@@ -433,7 +419,7 @@ MessagePackingBenchmark.utf8Packer:·gc.count                                   
     @Benchmark
     public void packer(PackerState state, Blackhole bh) {
         Packer packer = state.packer;
-        Function<CharSequence, byte[]> toBytes = state.toBytes;
+        EncodingCache toBytes = state.toBytes;
         for (int i = 0; i < state.size; ++i) {
             packer.writeMapHeader(1);
             packer.writeString(state.strings[i], toBytes);
@@ -443,27 +429,10 @@ MessagePackingBenchmark.utf8Packer:·gc.count                                   
         bh.consume(state.buffer);
     }
 
-
-    @Benchmark
-    public void messagePacker(MessagePackerState state, Blackhole bh) throws IOException {
-        MessagePacker packer = state.packer;
-        ArrayBufferOutput output = state.messageBufferOutput;
-        packer.packArrayHeader(state.size);
-        for (int i = 0; i < state.size; ++i) {
-            packer.packMapHeader(1);
-            packer.packString(state.strings[i]);
-            packer.packLong(state.longs[i]);
-        }
-        packer.flush();
-        bh.consume(output);
-        output.clear();
-        packer.clear();
-    }
-
     @Benchmark
     public void utf8Packer(PackerState state, Blackhole bh) {
         Packer packer = state.packer;
-        Function<CharSequence, byte[]> toBytes = state.toBytes;
+        EncodingCache toBytes = state.toBytes;
         for (int i = 0; i < state.size; ++i) {
             packer.writeMapHeader(1);
             byte[] utf8 = state.utf8s[i];
@@ -472,25 +441,6 @@ MessagePackingBenchmark.utf8Packer:·gc.count                                   
         }
         packer.flush();
         bh.consume(state.buffer);
-    }
-
-
-    @Benchmark
-    public void utf8MessagePacker(MessagePackerState state, Blackhole bh) throws IOException {
-        MessagePacker packer = state.packer;
-        ArrayBufferOutput output = state.messageBufferOutput;
-        packer.packArrayHeader(state.size);
-        for (int i = 0; i < state.size; ++i) {
-            packer.packMapHeader(1);
-            byte[] utf8 = state.utf8s[i];
-            packer.packRawStringHeader(utf8.length);
-            packer.writePayload(utf8);
-            packer.packLong(state.longs[i]);
-        }
-        packer.flush();
-        bh.consume(output);
-        output.clear();
-        packer.clear();
     }
 
 }
